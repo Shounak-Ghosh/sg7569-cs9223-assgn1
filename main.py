@@ -26,7 +26,7 @@ def get_log_entry(log_index, debug=False):
             if debug:
                 print("No entry found for the given log index.")
             return None
-        # Return the full JSON response (dict of UUID: entry)
+        # Return the entry from response (dict of UUID: entry)
         uuid = next(iter(data))
         entry = data[uuid]
         return entry
@@ -47,34 +47,6 @@ def get_verification_proof(log_index, debug=False):
     body_b64 = log_entry.get("body")
     if not body_b64:
         raise ValueError("Log entry does not contain 'body' field")
-    decoded_body = base64.b64decode(body_b64).decode('utf-8')
-    if debug:
-        print("Decoded body:", decoded_body)
-    body_json = json.loads(decoded_body)
-    signature_json = body_json.get("spec", {}).get("signature", {})
-    public_key_cert = signature_json.get("publicKey", {}).get("content")
-    signature_b64 = signature_json.get("content")
-    if debug:
-        print("Public Key Certificate (base64):", public_key_cert)
-        print("Signature (base64):", signature_b64)
-
-    # Ensure public_key_cert is properly decoded and formatted as a PEM file
-    try:
-        if isinstance(public_key_cert, str):
-            public_key_cert = base64.b64decode(public_key_cert)
-        if not public_key_cert.startswith(b"-----BEGIN CERTIFICATE-----"):
-            public_key_cert = b"-----BEGIN CERTIFICATE-----\n" + public_key_cert + b"\n-----END CERTIFICATE-----"
-    except Exception as e:
-        raise ValueError("Failed to decode or format public key certificate") from e
-
-    public_key = extract_public_key(public_key_cert)
-    signature = base64.b64decode(signature_b64)
-    if debug:
-        print("Extracted Public Key (PEM):", public_key.decode('utf-8'))
-        print("Decoded Signature (bytes):", signature)
-
-    if verify_artifact_signature(signature, public_key, "artifact.md"):
-        print("Artifact signature successfully verified.")
     
     leaf_hash = compute_leaf_hash(body_b64)
     if debug:
@@ -89,24 +61,117 @@ def get_verification_proof(log_index, debug=False):
     hashes = inclusion_proof_json.get("hashes", [])
     root_hash = inclusion_proof_json.get("rootHash")
 
-    if verify_inclusion(DefaultHasher, index, tree_size, leaf_hash, hashes, root_hash, debug):
-        print("Inclusion proof successfully verified.")
+    return  index, tree_size, leaf_hash, hashes, root_hash
 
 def inclusion(log_index, artifact_filepath, debug=False):
     # verify that log index and artifact filepath values are sane
+    if not isinstance(log_index, int) or log_index < 0:
+        raise ValueError("log_index must be a non-negative integer")
+    if not isinstance(artifact_filepath, str) or not artifact_filepath:
+        raise ValueError("artifact_filepath must be a non-empty string")
+    log_entry = get_log_entry(log_index, debug)
+    if log_entry is None:
+        raise ValueError("No log entry found for the given log index")
+    # extract signature and certificate from log_entry (encoded in base64)
+    # Start by decoding the body to get the full entry
+    body_b64 = log_entry.get("body")
+    if not body_b64:
+        raise ValueError("Log entry does not contain 'body' field")
+    decoded_body = base64.b64decode(body_b64).decode('utf-8')
+    if debug:
+        print("Decoded body:\n", decoded_body)
+    body_json = json.loads(decoded_body)
+    signature_json = body_json.get("spec", {}).get("signature", {})
+    public_key_cert = signature_json.get("publicKey", {}).get("content")
+    signature_b64 = signature_json.get("content")
+    # ensure public_key_cert is properly decoded and formatted as a PEM file
+    try:
+        if isinstance(public_key_cert, str):
+            public_key_cert = base64.b64decode(public_key_cert)
+        if not public_key_cert.startswith(b"-----BEGIN CERTIFICATE-----"):
+            public_key_cert = b"-----BEGIN CERTIFICATE-----\n" + public_key_cert + b"\n-----END CERTIFICATE-----"
+    except Exception as e:
+        raise ValueError("Failed to decode or format public key certificate") from e
     # extract_public_key(certificate)
+    public_key = extract_public_key(public_key_cert)
+    signature = base64.b64decode(signature_b64)
+    if debug:
+        print("Extracted Public Key (PEM):", public_key.decode('utf-8'))
+        print("Decoded Signature (bytes):", signature)
+    # verify the artifact signature using the extracted public key
     # verify_artifact_signature(signature, public_key, artifact_filepath)
+    try:
+        verify_artifact_signature(signature, public_key, artifact_filepath)
+    except Exception as e:
+        raise e
+    print("Signature is valid.")
+    
     # get_verification_proof(log_index)
-    # verify_inclusion(DefaultHasher, index, tree_size, leaf_hash, hashes, root_hash)
-    pass
+    index, tree_size, leaf_hash, hashes, root_hash = get_verification_proof(log_index, debug)
+    try:
+        verify_inclusion(DefaultHasher, index, tree_size, leaf_hash, hashes, root_hash)
+    except Exception as e:
+        raise e
+    print("Offline root hash calculation for inclusion verified.")
 
 def get_latest_checkpoint(debug=False):
-    pass
+    # fetch the latest checkpoint from the Rekor server
+    REKOR_API_URL = "https://rekor.sigstore.dev/api/v1/log"
+    try:
+        response = requests.get(REKOR_API_URL)
+        if debug:
+            print(f"Request URL: {response.url}")
+            print(f"Status Code: {response.status_code}")
+        response.raise_for_status()
+        data = response.json()
+        if debug:
+            print(json.dumps(data, indent=2))
+        return data
+    except Exception as e:
+        if debug:
+            print(f"Error fetching latest checkpoint: {e}")
+        return None
 
 def consistency(prev_checkpoint, debug=False):
     # verify that prev checkpoint is not empty
-    # get_latest_checkpoint()
-    pass
+    if not prev_checkpoint:
+        print("Previous checkpoint is empty")
+        return
+    latest_checkpoint = get_latest_checkpoint(debug)
+    if not latest_checkpoint:
+        print("Failed to fetch latest checkpoint")
+        return
+    latest_tree_size = latest_checkpoint.get("treeSize")
+    # get consistencey proof
+    REKOR_API_URL = "https://rekor.sigstore.dev/api/v1/log/proof"
+    proof = None 
+    try:
+        params = {
+            "firstSize": prev_checkpoint.get("treeSize"),
+            "lastSize": latest_tree_size,
+            "treeID": prev_checkpoint.get("treeID")
+        }
+        response = requests.get(REKOR_API_URL, params=params)
+        if debug:
+            print(f"Request URL: {response.url}")
+            print(f"Status Code: {response.status_code}")
+        response.raise_for_status()
+        data = response.json()
+        proof = data.get("hashes", [])
+        if debug:
+            print(json.dumps(data, indent=2))
+    except Exception as e:
+        if debug:
+            print(f"Error fetching consistency proof: {e}")
+        return
+
+    # compare prev_checkpoint with latest_checkpoint
+    # verify_consistency(hasher, size1, size2, proof, root1, root2)
+    try:
+        verify_consistency(DefaultHasher, prev_checkpoint.get("treeSize"), latest_tree_size, proof, prev_checkpoint.get("rootHash"), latest_checkpoint.get("rootHash"))
+    except Exception as e:
+        raise e
+    print("Consistency verification successful.")
 
 def main():
     debug = False
@@ -163,7 +228,7 @@ def main():
         consistency(prev_checkpoint, debug)
 
 if __name__ == "__main__":
-    # main()
+    main()
 
     # print(get_log_entry(495027577, debug=True))
-    print(get_verification_proof(495027577, debug=True))
+    # print(get_verification_proof(495027577, debug=True))
