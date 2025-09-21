@@ -1,0 +1,10 @@
+[project]
+name = "sg7569-cs9223-assgn1"
+version = "0.1.0"
+description = "Code for software supply chain security assignment 1"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "cryptography>=46.0.1",
+    "requests>=2.32.5",
+]
