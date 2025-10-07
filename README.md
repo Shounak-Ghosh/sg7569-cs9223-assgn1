@@ -9,4 +9,8 @@ Code for CS9223 Assignment 1 with Prof. Justin Cappos
         - https://rekor.sigstore.dev/api/v1/log?logIndex=495027577
         - https://search.sigstore.dev/?logIndex=495027577
 - `python main.py --inclusion 495027577 --artifact artifact.md`
-- `python main.py --consistency --tree-id 1193050959916656506 --tree-size 373980633 --root-hash cf2af3bef55a119948a8e5c13cce1ea2c0807cdf400cb68ef21067e56dc3a2ba` 
+- `python main.py --consistency --tree-id 1193050959916656506 --tree-size 373980633 --root-hash cf2af3bef55a119948a8e5c13cce1ea2c0807cdf400cb68ef21067e56dc3a2ba`
+
+# Assignment 2 Notes
+- Used this command for `pylint` to prevent `.venv` linter errors from appearing: `pylint main.py merkle_proof.py util.py  --output pylint.initial.txt`
+- Similar for `bandit`: `bandit -r main.py merkle_proof.py util.py -o bandit-initial.txt -f txt`

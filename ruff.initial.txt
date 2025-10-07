@@ -1,0 +1,25 @@
+E741 Ambiguous variable name: `l`
+  --> merkle_proof.py:25:29
+   |
+23 |         return h.digest()
+24 |
+25 |     def hash_children(self, l, r):
+   |                             ^
+26 |         h = self.new()
+27 |         b = bytes([RFC6962_NODE_HASH_PREFIX]) + l + r
+   |
+
+F841 [*] Local variable `e` is assigned to but never used
+  --> util.py:57:32
+   |
+55 |             ec.ECDSA(hashes.SHA256())
+56 |         )
+57 |     except InvalidSignature as e:
+   |                                ^
+58 |         print("Signature is invalid")
+59 |     except Exception as e:
+   |
+help: Remove assignment to unused variable `e`
+
+Found 2 errors.
+[*] 1 fixable with the `--fix` option.
