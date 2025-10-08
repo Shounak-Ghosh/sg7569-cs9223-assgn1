@@ -1,7 +1,13 @@
+"""
+Fetch a log entry from the Rekor transparency log.
+"""
+
 import argparse
-import json
-import requests
 import base64
+import json
+
+import requests
+
 from util import extract_public_key, verify_artifact_signature
 from merkle_proof import (
     DefaultHasher,
@@ -10,16 +16,31 @@ from merkle_proof import (
     compute_leaf_hash,
 )
 
+# Constants
+REKOR_LOGS_URL = "https://rekor.sigstore.dev/api/v1/log"
+REKOR_ENTRIES_URL = "https://rekor.sigstore.dev/api/v1/log/entries"
+REKOR_PROOF_URL = "https://rekor.sigstore.dev/api/v1/log/proof"
+
 
 def get_log_entry(log_index, debug=False):
+    """Fetch a log entry from the Rekor transparency log.
+
+    Args:
+        log_index (int): The index of the log entry to fetch.
+        debug (bool, optional): If True, print debug information. Defaults to False.
+    Raises:
+        ValueError: If the log_index is not a non-negative integer.
+
+    Returns:
+        dict: The log entry data if found, else None.
+    """
     # verify that log index value is sane
     if not isinstance(log_index, int) or log_index < 0:
         raise ValueError("log_index must be a non-negative integer")
 
-    REKOR_API_URL = "https://rekor.sigstore.dev/api/v1/log/entries"
     params = {"logIndex": log_index}
     try:
-        response = requests.get(REKOR_API_URL, params=params)
+        response = requests.get(REKOR_ENTRIES_URL, params=params, timeout=10)
         if debug:
             print(f"Request URL: {response.url}")
             print(f"Status Code: {response.status_code}")
@@ -36,13 +57,27 @@ def get_log_entry(log_index, debug=False):
         uuid = next(iter(data))
         entry = data[uuid]
         return entry
-    except Exception as e:
+    except requests.RequestException as e:
         if debug:
             print(f"Error fetching log entry: {e}")
         return None
 
 
 def get_verification_proof(log_index, debug=False):
+    """Fetch the verification proof for a given log index.
+
+    Args:
+        log_index (int): The index of the log entry to fetch the proof for.
+        debug (bool, optional): If True, print debug information. Defaults to False.
+    Raises:
+        ValueError: If the log_index is not a non-negative integer.
+        ValueError: If no log entry is found for the given log index.
+        ValueError: If the log entry does not contain 'body' field.
+        ValueError: If the log entry does not contain 'inclusionProof' field.
+
+    Returns:
+        tuple: A tuple containing index, tree_size, leaf_hash, hashes, and root_hash.
+    """
     # verify that log index value is sane
     if not isinstance(log_index, int) or log_index < 0:
         raise ValueError("log_index must be a non-negative integer")
@@ -72,6 +107,22 @@ def get_verification_proof(log_index, debug=False):
 
 
 def inclusion(log_index, artifact_filepath, debug=False):
+    """Verify inclusion of an artifact in the transparency log.
+
+    Args:
+        log_index (int): The index of the log entry.
+        artifact_filepath (str): The file path of the artifact to verify.
+        debug (bool, optional): If True, print debug information. Defaults to False.
+
+    Raises:
+        ValueError: If log_index is not a non-negative integer.
+        ValueError: If artifact_filepath is not a non-empty string.
+        ValueError: If no log entry is found for the given log index.
+        ValueError: If the log entry does not contain 'body' field.
+        ValueError: If the log entry does not contain 'verification' field.
+        e: Exception raised during signature verification.
+        e: Exception raised during inclusion proof verification.
+    """
     # verify that log index and artifact filepath values are sane
     if not isinstance(log_index, int) or log_index < 0:
         raise ValueError("log_index must be a non-negative integer")
@@ -130,10 +181,17 @@ def inclusion(log_index, artifact_filepath, debug=False):
 
 
 def get_latest_checkpoint(debug=False):
+    """Fetch the latest checkpoint from the Rekor transparency log.
+
+    Args:
+        debug (bool, optional): If True, print debug information. Defaults to False.
+
+    Returns:
+        dict: The latest checkpoint data if fetched successfully, else None.
+    """
     # fetch the latest checkpoint from the Rekor server
-    REKOR_API_URL = "https://rekor.sigstore.dev/api/v1/log"
     try:
-        response = requests.get(REKOR_API_URL)
+        response = requests.get(REKOR_LOGS_URL, timeout=10)
         if debug:
             print(f"Request URL: {response.url}")
             print(f"Status Code: {response.status_code}")
@@ -142,13 +200,22 @@ def get_latest_checkpoint(debug=False):
         if debug:
             print(json.dumps(data, indent=2))
         return data
-    except Exception as e:
+    except requests.RequestException as e:
         if debug:
             print(f"Error fetching latest checkpoint: {e}")
         return None
 
 
 def consistency(prev_checkpoint, debug=False):
+    """Verify consistency of a given checkpoint with the latest checkpoint.
+
+    Args:
+        prev_checkpoint (dict): The previous checkpoint data.
+        debug (bool, optional): If True, print debug information. Defaults to False.
+
+    Raises:
+        e: Exception raised during consistency verification.
+    """
     # verify that prev checkpoint is not empty
     if not prev_checkpoint:
         print("Previous checkpoint is empty")
@@ -158,8 +225,7 @@ def consistency(prev_checkpoint, debug=False):
         print("Failed to fetch latest checkpoint")
         return
     latest_tree_size = latest_checkpoint.get("treeSize")
-    # get consistencey proof
-    REKOR_API_URL = "https://rekor.sigstore.dev/api/v1/log/proof"
+    # get consistency proof
     proof = None
     try:
         params = {
@@ -167,7 +233,7 @@ def consistency(prev_checkpoint, debug=False):
             "lastSize": latest_tree_size,
             "treeID": prev_checkpoint.get("treeID"),
         }
-        response = requests.get(REKOR_API_URL, params=params)
+        response = requests.get(REKOR_PROOF_URL, params=params, timeout=10)
         if debug:
             print(f"Request URL: {response.url}")
             print(f"Status Code: {response.status_code}")
@@ -176,7 +242,7 @@ def consistency(prev_checkpoint, debug=False):
         proof = data.get("hashes", [])
         if debug:
             print(json.dumps(data, indent=2))
-    except Exception as e:
+    except requests.RequestException as e:
         if debug:
             print(f"Error fetching consistency proof: {e}")
         return
@@ -198,6 +264,9 @@ def consistency(prev_checkpoint, debug=False):
 
 
 def main():
+    """
+    Main function to parse arguments and execute Rekor verification commands.
+    """
     debug = False
     parser = argparse.ArgumentParser(description="Rekor Verifier")
     parser.add_argument(
