@@ -14,6 +14,8 @@ from merkle_proof import (
     verify_consistency,
     verify_inclusion,
     compute_leaf_hash,
+    ConsistencyProof,
+    InclusionProof,
 )
 
 # Constants
@@ -61,6 +63,54 @@ def get_log_entry(log_index, debug=False):
         if debug:
             print(f"Error fetching log entry: {e}")
         return None
+
+
+def _verify_artifact_with_log_entry(log_entry, artifact_filepath, debug=False):
+    """Helper function to verify artifact signature using log entry data.
+
+    Args:
+        log_entry (dict): The log entry containing signature information.
+        artifact_filepath (str): The file path of the artifact to verify.
+        debug (bool, optional): If True, print debug information. Defaults to False.
+
+    Raises:
+        ValueError: If log entry is missing required fields.
+        Exception: If signature verification fails.
+    """
+    body_b64 = log_entry.get("body")
+    if not body_b64:
+        raise ValueError("Log entry does not contain 'body' field")
+
+    decoded_body = base64.b64decode(body_b64).decode("utf-8")
+    if debug:
+        print("Decoded body:\n", decoded_body)
+
+    body_json = json.loads(decoded_body)
+    signature_json = body_json.get("spec", {}).get("signature", {})
+    public_key_cert = signature_json.get("publicKey", {}).get("content")
+    signature_b64 = signature_json.get("content")
+
+    # ensure public_key_cert is properly decoded and formatted as a PEM file
+    try:
+        if isinstance(public_key_cert, str):
+            public_key_cert = base64.b64decode(public_key_cert)
+        if not public_key_cert.startswith(b"-----BEGIN CERTIFICATE-----"):
+            public_key_cert = (
+                b"-----BEGIN CERTIFICATE-----\n"
+                + public_key_cert
+                + b"\n-----END CERTIFICATE-----"
+            )
+    except Exception as e:
+        raise ValueError("Failed to decode or format public key certificate") from e
+
+    public_key = extract_public_key(public_key_cert)
+    signature = base64.b64decode(signature_b64)
+
+    if debug:
+        print("Extracted Public Key (PEM):", public_key.decode("utf-8"))
+        print("Decoded Signature (bytes):", signature)
+
+    verify_artifact_signature(signature, public_key, artifact_filepath)
 
 
 def get_verification_proof(log_index, debug=False):
@@ -120,63 +170,29 @@ def inclusion(log_index, artifact_filepath, debug=False):
         ValueError: If no log entry is found for the given log index.
         ValueError: If the log entry does not contain 'body' field.
         ValueError: If the log entry does not contain 'verification' field.
-        e: Exception raised during signature verification.
-        e: Exception raised during inclusion proof verification.
+        Exception: If signature verification fails.
+        Exception: If inclusion proof verification fails.
     """
     # verify that log index and artifact filepath values are sane
     if not isinstance(log_index, int) or log_index < 0:
         raise ValueError("log_index must be a non-negative integer")
     if not isinstance(artifact_filepath, str) or not artifact_filepath:
         raise ValueError("artifact_filepath must be a non-empty string")
+
     log_entry = get_log_entry(log_index, debug)
     if log_entry is None:
         raise ValueError("No log entry found for the given log index")
-    # extract signature and certificate from log_entry (encoded in base64)
-    # Start by decoding the body to get the full entry
-    body_b64 = log_entry.get("body")
-    if not body_b64:
-        raise ValueError("Log entry does not contain 'body' field")
-    decoded_body = base64.b64decode(body_b64).decode("utf-8")
-    if debug:
-        print("Decoded body:\n", decoded_body)
-    body_json = json.loads(decoded_body)
-    signature_json = body_json.get("spec", {}).get("signature", {})
-    public_key_cert = signature_json.get("publicKey", {}).get("content")
-    signature_b64 = signature_json.get("content")
-    # ensure public_key_cert is properly decoded and formatted as a PEM file
-    try:
-        if isinstance(public_key_cert, str):
-            public_key_cert = base64.b64decode(public_key_cert)
-        if not public_key_cert.startswith(b"-----BEGIN CERTIFICATE-----"):
-            public_key_cert = (
-                b"-----BEGIN CERTIFICATE-----\n"
-                + public_key_cert
-                + b"\n-----END CERTIFICATE-----"
-            )
-    except Exception as e:
-        raise ValueError("Failed to decode or format public key certificate") from e
-    # extract_public_key(certificate)
-    public_key = extract_public_key(public_key_cert)
-    signature = base64.b64decode(signature_b64)
-    if debug:
-        print("Extracted Public Key (PEM):", public_key.decode("utf-8"))
-        print("Decoded Signature (bytes):", signature)
-    # verify the artifact signature using the extracted public key
-    # verify_artifact_signature(signature, public_key, artifact_filepath)
-    try:
-        verify_artifact_signature(signature, public_key, artifact_filepath)
-    except Exception as e:
-        raise e
+
+    # Verify artifact signature
+    _verify_artifact_with_log_entry(log_entry, artifact_filepath, debug)
     print("Signature is valid.")
 
-    # get_verification_proof(log_index)
+    # Verify inclusion proof
     index, tree_size, leaf_hash, hashes, root_hash = get_verification_proof(
         log_index, debug
     )
-    try:
-        verify_inclusion(DefaultHasher, index, tree_size, leaf_hash, hashes, root_hash)
-    except Exception as e:
-        raise e
+    inclusion_proof = InclusionProof(leaf_hash=leaf_hash, proof=hashes, root=root_hash)
+    verify_inclusion(DefaultHasher, index, tree_size, inclusion_proof)
     print("Offline root hash calculation for inclusion verified.")
 
 
@@ -248,15 +264,17 @@ def consistency(prev_checkpoint, debug=False):
         return
 
     # compare prev_checkpoint with latest_checkpoint
-    # verify_consistency(hasher, size1, size2, proof, root1, root2)
     try:
+        consistency_proof = ConsistencyProof(
+            proof=proof,
+            root1=prev_checkpoint.get("rootHash"),
+            root2=latest_checkpoint.get("rootHash"),
+        )
         verify_consistency(
             DefaultHasher,
             prev_checkpoint.get("treeSize"),
             latest_tree_size,
-            proof,
-            prev_checkpoint.get("rootHash"),
-            latest_checkpoint.get("rootHash"),
+            consistency_proof,
         )
     except Exception as e:
         raise e
