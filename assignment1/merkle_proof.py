@@ -5,10 +5,29 @@ Merkle proof verification utilities.
 import hashlib
 import binascii
 import base64
+from dataclasses import dataclass
 
 # domain separation prefixes according to the RFC
 RFC6962_LEAF_HASH_PREFIX = 0
 RFC6962_NODE_HASH_PREFIX = 1
+
+
+@dataclass
+class ConsistencyProof:
+    """Container for consistency proof data."""
+
+    proof: list
+    root1: str
+    root2: str
+
+
+@dataclass
+class InclusionProof:
+    """Container for inclusion proof data."""
+
+    leaf_hash: str
+    proof: list
+    root: str
 
 
 class Hasher:
@@ -48,16 +67,45 @@ class Hasher:
 DefaultHasher = Hasher(hashlib.sha256)
 
 
-def verify_consistency(hasher, size1, size2, proof, root1, root2):
+def _validate_consistency_inputs(size1, size2, proof_len, root1, root2):
+    """Validate consistency proof inputs.
+
+    Args:
+        size1 (int): The size of the first tree.
+        size2 (int): The size of the second tree.
+        proof_len (int): The length of the proof.
+        root1 (bytes): The first root hash.
+        root2 (bytes): The second root hash.
+
+    Raises:
+        ValueError: If inputs are invalid.
+    """
+    if size2 < size1:
+        raise ValueError(f"size2 ({size2}) < size1 ({size1})")
+    if size1 == size2:
+        if proof_len > 0:
+            raise ValueError("size1=size2, but bytearray_proof is not empty")
+        verify_match(root1, root2)
+        return True
+    if size1 == 0:
+        if proof_len > 0:
+            raise ValueError(
+                f"expected empty bytearray_proof, but got {proof_len} components"
+            )
+        return True
+    if proof_len == 0:
+        raise ValueError("empty bytearray_proof")
+    return False
+
+
+def verify_consistency(hasher, size1, size2, consistency_proof):
     """Verify the consistency of two Merkle tree roots.
 
     Args:
         hasher (Hasher): The Merkle tree hasher implementing RFC 6962.
         size1 (int): The size of the first tree.
         size2 (int): The size of the second tree.
-        proof (list): The consistency proof as a list of hex strings.
-        root1 (str): The root hash of the first tree as a hex string.
-        root2 (str): The root hash of the second tree as a hex string.
+        consistency_proof (ConsistencyProof): The consistency proof data.
 
     Raises:
         ValueError: If size2 is less than size1.
@@ -68,52 +116,50 @@ def verify_consistency(hasher, size1, size2, proof, root1, root2):
         RootMismatchError: If calculated root does not match expected root.
     """
     # change format of args to be bytearray instead of hex strings
-    root1 = bytes.fromhex(root1)
-    root2 = bytes.fromhex(root2)
-    bytearray_proof = []
-    for elem in proof:
-        bytearray_proof.append(bytes.fromhex(elem))
+    root1_bytes = bytes.fromhex(consistency_proof.root1)
+    root2_bytes = bytes.fromhex(consistency_proof.root2)
+    bytearray_proof = [bytes.fromhex(elem) for elem in consistency_proof.proof]
 
-    if size2 < size1:
-        raise ValueError(f"size2 ({size2}) < size1 ({size1})")
-    if size1 == size2:
-        if bytearray_proof:
-            raise ValueError("size1=size2, but bytearray_proof is not empty")
-        verify_match(root1, root2)
+    # Validate inputs and handle edge cases
+    if _validate_consistency_inputs(
+        size1, size2, len(bytearray_proof), root1_bytes, root2_bytes
+    ):
         return
-    if size1 == 0:
-        if bytearray_proof:
-            raise ValueError(
-                f"expected empty bytearray_proof, but got {len(bytearray_proof)} components"
-            )
-        return
-    if not bytearray_proof:
-        raise ValueError("empty bytearray_proof")
 
     inner, border = decomp_incl_proof(size1 - 1, size2)
     shift = (size1 & -size1).bit_length() - 1
     inner -= shift
 
-    if size1 == 1 << shift:
-        seed, start = root1, 0
-    else:
-        seed, start = bytearray_proof[0], 1
+    seed, start = (root1_bytes, 0) if size1 == 1 << shift else (bytearray_proof[0], 1)
 
     if len(bytearray_proof) != start + inner + border:
         raise ValueError(
-            f"wrong bytearray_proof size {len(bytearray_proof)}, want {start + inner + border}"
+            f"wrong bytearray_proof size {len(bytearray_proof)}, "
+            f"want {start + inner + border}"
         )
 
-    bytearray_proof = bytearray_proof[start:]
-
+    proof_slice = bytearray_proof[start:]
     mask = (size1 - 1) >> shift
-    hash1 = chain_inner_right(hasher, seed, bytearray_proof[:inner], mask)
-    hash1 = chain_border_right(hasher, hash1, bytearray_proof[inner:])
-    verify_match(hash1, root1)
 
-    hash2 = chain_inner(hasher, seed, bytearray_proof[:inner], mask)
-    hash2 = chain_border_right(hasher, hash2, bytearray_proof[inner:])
-    verify_match(hash2, root2)
+    # Verify first hash path
+    verify_match(
+        chain_border_right(
+            hasher,
+            chain_inner_right(hasher, seed, proof_slice[:inner], mask),
+            proof_slice[inner:],
+        ),
+        root1_bytes,
+    )
+
+    # Verify second hash path
+    verify_match(
+        chain_border_right(
+            hasher,
+            chain_inner(hasher, seed, proof_slice[:inner], mask),
+            proof_slice[inner:],
+        ),
+        root2_bytes,
+    )
 
 
 def verify_match(calculated, expected):
@@ -259,16 +305,14 @@ def root_from_inclusion_proof(hasher, index, size, leaf_hash, proof):
     return res
 
 
-def verify_inclusion(hasher, index, size, leaf_hash, proof, root, debug=False):
+def verify_inclusion(hasher, index, size, inclusion_proof, debug=False):
     """Verify the inclusion of a leaf in a Merkle tree.
 
     Args:
         hasher (Hasher): The Merkle tree hasher implementing RFC 6962.
         index (int): The index of the leaf.
         size (int): The size of the tree.
-        leaf_hash (str): The hash of the leaf as a hex string.
-        proof (list): The Merkle proof as a list of hex strings.
-        root (str): The root hash of the Merkle tree as a hex string.
+        inclusion_proof (InclusionProof): The inclusion proof data.
         debug (bool, optional): Whether to print debug information. Defaults to False.
 
     Raises:
@@ -277,16 +321,15 @@ def verify_inclusion(hasher, index, size, leaf_hash, proof, root, debug=False):
         ValueError: If proof size does not match expected size.
         RootMismatchError: If calculated root does not match expected root.
     """
-    bytearray_proof = []
-    for elem in proof:
-        bytearray_proof.append(bytes.fromhex(elem))
+    bytearray_proof = [bytes.fromhex(elem) for elem in inclusion_proof.proof]
+    bytearray_root = bytes.fromhex(inclusion_proof.root)
+    bytearray_leaf = bytes.fromhex(inclusion_proof.leaf_hash)
 
-    bytearray_root = bytes.fromhex(root)
-    bytearray_leaf = bytes.fromhex(leaf_hash)
     calc_root = root_from_inclusion_proof(
         hasher, index, size, bytearray_leaf, bytearray_proof
     )
     verify_match(calc_root, bytearray_root)
+
     if debug:
         print("Calculated root hash", calc_root.hex())
         print("Given root hash", bytearray_root.hex())
