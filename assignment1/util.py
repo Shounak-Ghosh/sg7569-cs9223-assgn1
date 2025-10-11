@@ -55,6 +55,12 @@ def verify_artifact_signature(signature, public_key, artifact_filename):
         signature (bytes): The signature to verify.
         public_key (bytes): The public key in PEM format.
         artifact_filename (str): The path to the artifact file.
+        
+    Raises:
+        InvalidSignature: If the signature is invalid.
+        ValueError: If there's an error in the verification process.
+        TypeError: If there's a type error in the verification process.
+        FileNotFoundError: If the artifact file is not found.
     """
     # load the public key
     # with open("cert_public.pem", "rb") as pub_key_file:
@@ -73,9 +79,9 @@ def verify_artifact_signature(signature, public_key, artifact_filename):
     try:
         public_key.verify(signature, data, ec.ECDSA(hashes.SHA256()))
     except InvalidSignature as e:
-        print("Signature is invalid:", e)
+        raise InvalidSignature("Signature verification failed: signature is invalid") from e
     except (ValueError, TypeError) as e:
-        print("Exception in verifying artifact signature:", e)
+        raise ValueError(f"Signature verification failed: {e}") from e
 
 
 def verify_artifact_with_log_entry(log_entry, artifact_filepath, debug=False):
