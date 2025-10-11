@@ -12,5 +12,8 @@ Code for CS9223 Assignment 1 with Prof. Justin Cappos
 - `python main.py --consistency --tree-id 1193050959916656506 --tree-size 373980633 --root-hash cf2af3bef55a119948a8e5c13cce1ea2c0807cdf400cb68ef21067e56dc3a2ba`
 
 # Assignment 2 Notes
-- Used this command for `pylint` to prevent `.venv` linter errors from appearing: `pylint main.py merkle_proof.py util.py  --output pylint.initial.txt`
-- Similar for `bandit`: `bandit -r main.py merkle_proof.py util.py -o bandit-initial.txt -f txt`
+- `ruff format`
+- `ruff check -o ruff.output.txt`
+- `pylint . --output pylint.output.txt`
+- `mypy main.py merkle_proof.py util.py > mypy.output.txt`
+- `bandit -r . -o bandit-output.txt -f txt`
