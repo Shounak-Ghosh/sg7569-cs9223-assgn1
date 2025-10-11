@@ -8,7 +8,7 @@ import json
 
 import requests
 
-from util import extract_public_key, verify_artifact_signature
+from util import extract_public_key, verify_artifact_signature, verify_artifact_with_log_entry
 from merkle_proof import (
     DefaultHasher,
     verify_consistency,
@@ -63,54 +63,6 @@ def get_log_entry(log_index, debug=False):
         if debug:
             print(f"Error fetching log entry: {e}")
         return None
-
-
-def _verify_artifact_with_log_entry(log_entry, artifact_filepath, debug=False):
-    """Helper function to verify artifact signature using log entry data.
-
-    Args:
-        log_entry (dict): The log entry containing signature information.
-        artifact_filepath (str): The file path of the artifact to verify.
-        debug (bool, optional): If True, print debug information. Defaults to False.
-
-    Raises:
-        ValueError: If log entry is missing required fields.
-        Exception: If signature verification fails.
-    """
-    body_b64 = log_entry.get("body")
-    if not body_b64:
-        raise ValueError("Log entry does not contain 'body' field")
-
-    decoded_body = base64.b64decode(body_b64).decode("utf-8")
-    if debug:
-        print("Decoded body:\n", decoded_body)
-
-    body_json = json.loads(decoded_body)
-    signature_json = body_json.get("spec", {}).get("signature", {})
-    public_key_cert = signature_json.get("publicKey", {}).get("content")
-    signature_b64 = signature_json.get("content")
-
-    # ensure public_key_cert is properly decoded and formatted as a PEM file
-    try:
-        if isinstance(public_key_cert, str):
-            public_key_cert = base64.b64decode(public_key_cert)
-        if not public_key_cert.startswith(b"-----BEGIN CERTIFICATE-----"):
-            public_key_cert = (
-                b"-----BEGIN CERTIFICATE-----\n"
-                + public_key_cert
-                + b"\n-----END CERTIFICATE-----"
-            )
-    except Exception as e:
-        raise ValueError("Failed to decode or format public key certificate") from e
-
-    public_key = extract_public_key(public_key_cert)
-    signature = base64.b64decode(signature_b64)
-
-    if debug:
-        print("Extracted Public Key (PEM):", public_key.decode("utf-8"))
-        print("Decoded Signature (bytes):", signature)
-
-    verify_artifact_signature(signature, public_key, artifact_filepath)
 
 
 def get_verification_proof(log_index, debug=False):
@@ -184,7 +136,7 @@ def inclusion(log_index, artifact_filepath, debug=False):
         raise ValueError("No log entry found for the given log index")
 
     # Verify artifact signature
-    _verify_artifact_with_log_entry(log_entry, artifact_filepath, debug)
+    verify_artifact_with_log_entry(log_entry, artifact_filepath, debug)
     print("Signature is valid.")
 
     # Verify inclusion proof
@@ -361,5 +313,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-    # print(get_log_entry(495027577, debug=True))
-    # print(get_verification_proof(495027577, debug=True))
