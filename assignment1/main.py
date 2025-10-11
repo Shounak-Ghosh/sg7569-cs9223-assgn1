@@ -1,15 +1,15 @@
 """
-Fetch a log entry from the Rekor transparency log.
+Rekor Transparency Log Verifier
+
+This module provides command-line tools to verify artifact inclusion and consistency
+in the Rekor transparency log using Merkle proofs.
 """
 
 import argparse
-import base64
 import json
 import os
-
 import requests
-
-from util import extract_public_key, verify_artifact_signature, verify_artifact_with_log_entry
+from util import verify_artifact_with_log_entry
 from merkle_proof import (
     DefaultHasher,
     verify_consistency,
@@ -132,11 +132,11 @@ def inclusion(log_index, artifact_filepath, debug=False):
         raise ValueError("log_index must be a non-negative integer")
     if not isinstance(artifact_filepath, str) or not artifact_filepath:
         raise ValueError("artifact_filepath must be a non-empty string")
-    
+
     # Check if the artifact file exists
     if not os.path.exists(artifact_filepath):
         raise FileNotFoundError(f"Artifact file not found: {artifact_filepath}")
-    
+
     # Check if it's actually a file (not a directory)
     if not os.path.isfile(artifact_filepath):
         raise ValueError(f"Artifact path is not a file: {artifact_filepath}")
@@ -154,7 +154,9 @@ def inclusion(log_index, artifact_filepath, debug=False):
         index, tree_size, leaf_hash, hashes, root_hash = get_verification_proof(
             log_index, debug
         )
-        inclusion_proof = InclusionProof(leaf_hash=leaf_hash, proof=hashes, root=root_hash)
+        inclusion_proof = InclusionProof(
+            leaf_hash=leaf_hash, proof=hashes, root=root_hash
+        )
         verify_inclusion(DefaultHasher, index, tree_size, inclusion_proof)
         print("Offline root hash calculation for inclusion verified.")
     except Exception as e:
@@ -248,100 +250,127 @@ def consistency(prev_checkpoint, debug=False):
         raise ValueError(f"Consistency verification failed: {e}") from e
 
 
+def handle_checkpoint(debug):
+    """Fetch and print the latest checkpoint from the Rekor server."""
+    checkpoint = get_latest_checkpoint(debug)
+    print(json.dumps(checkpoint, indent=4))
+
+
+def handle_inclusion(args, debug):
+    """Verify inclusion of an artifact in the transparency log."""
+    if not args.artifact:
+        print("Error: --artifact is required for inclusion verification")
+        return
+    inclusion(args.inclusion, args.artifact, debug)
+
+
+def handle_consistency(args, debug):
+    """Verify consistency of a given checkpoint with the latest checkpoint."""
+    missing = []
+    if not args.tree_id:
+        missing.append("tree id")
+    if not args.tree_size:
+        missing.append("tree size")
+    if not args.root_hash:
+        missing.append("root hash")
+    if missing:
+        print(f"please specify {' and '.join(missing)} for prev checkpoint")
+        return
+    prev_checkpoint = {
+        "treeID": args.tree_id,
+        "treeSize": args.tree_size,
+        "rootHash": args.root_hash,
+    }
+    consistency(prev_checkpoint, debug)
+
+
 def main():
     """
     Main function to parse arguments and execute Rekor verification commands.
     """
-    debug = False
-    parser = argparse.ArgumentParser(description="Rekor Verifier")
-    parser.add_argument(
-        "-d", "--debug", help="Debug mode", required=False, action="store_true"
-    )  # Default false
-    parser.add_argument(
-        "-c",
-        "--checkpoint",
-        help="Obtain latest checkpoint\
-                        from Rekor Server public instance",
-        required=False,
-        action="store_true",
-    )
-    parser.add_argument(
-        "--inclusion",
-        help="Verify inclusion of an\
-                        entry in the Rekor Transparency Log using log index\
-                        and artifact filename.\
-                        Usage: --inclusion 126574567",
-        required=False,
-        type=int,
-    )
-    parser.add_argument(
-        "--artifact",
-        help="Artifact filepath for verifying\
-                        signature",
-        required=False,
-    )
-    parser.add_argument(
-        "--consistency",
-        help="Verify consistency of a given\
-                        checkpoint with the latest checkpoint.",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--tree-id", help="Tree ID for consistency proof", required=False
-    )
-    parser.add_argument(
-        "--tree-size", help="Tree size for consistency proof", required=False, type=int
-    )
-    parser.add_argument(
-        "--root-hash", help="Root hash for consistency proof", required=False
-    )
-    args = parser.parse_args()
-    if args.debug:
-        debug = True
-        print("enabled debug mode")
-    
-    try:
+
+    def get_args():
+        parser = argparse.ArgumentParser(description="Rekor Verifier")
+        parser.add_argument(
+            "-d", "--debug", help="Debug mode", required=False, action="store_true"
+        )  # Default false
+        parser.add_argument(
+            "-c",
+            "--checkpoint",
+            help="Obtain latest checkpoint from Rekor Server public instance",
+            required=False,
+            action="store_true",
+        )
+        parser.add_argument(
+            "--inclusion",
+            help=(
+                "Verify inclusion of an entry in the Rekor Transparency Log using log index "
+                "and artifact filename. "
+                "Usage: --inclusion 126574567"
+            ),
+            required=False,
+            type=int,
+        )
+        parser.add_argument(
+            "--artifact",
+            help="Artifact filepath for verifying signature",
+            required=False,
+        )
+        parser.add_argument(
+            "--consistency",
+            help="Verify consistency of a given checkpoint with the latest checkpoint.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--tree-id", help="Tree ID for consistency proof", required=False
+        )
+        parser.add_argument(
+            "--tree-size",
+            help="Tree size for consistency proof",
+            required=False,
+            type=int,
+        )
+        parser.add_argument(
+            "--root-hash", help="Root hash for consistency proof", required=False
+        )
+        return parser.parse_args()
+
+    def handle_debug(args):
+        debug = False
+        if args.debug:
+            debug = True
+            print("enabled debug mode")
+        return debug
+
+    args = get_args()
+    debug = handle_debug(args)
+
+    def handle_exceptions(func):
+        try:
+            func()
+        except ValueError as e:
+            print(f"Error: {e}")
+            if debug:
+                raise
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            if debug:
+                raise
+        except (TypeError, KeyError, IndexError) as e:
+            print(f"Unexpected error: {e}")
+            if debug:
+                raise
+
+    def run_commands():
         if args.checkpoint:
-            # get and print latest checkpoint from server
-            # if debug is enabled, store it in a file checkpoint.json
-            checkpoint = get_latest_checkpoint(debug)
-            print(json.dumps(checkpoint, indent=4))
+            handle_checkpoint(debug)
         if args.inclusion:
-            if not args.artifact:
-                print("Error: --artifact is required for inclusion verification")
-                return
-            inclusion(args.inclusion, args.artifact, debug)
+            handle_inclusion(args, debug)
         if args.consistency:
-            if not args.tree_id:
-                print("please specify tree id for prev checkpoint")
-                return
-            if not args.tree_size:
-                print("please specify tree size for prev checkpoint")
-                return
-            if not args.root_hash:
-                print("please specify root hash for prev checkpoint")
-                return
+            handle_consistency(args, debug)
 
-            prev_checkpoint = {}
-            prev_checkpoint["treeID"] = args.tree_id
-            prev_checkpoint["treeSize"] = args.tree_size
-            prev_checkpoint["rootHash"] = args.root_hash
-
-            consistency(prev_checkpoint, debug)
-    except ValueError as e:
-        print(f"Error: {e}")
-        if debug:
-            raise  # Re-raise in debug mode to show full traceback
-    except FileNotFoundError as e:
-        print(f"Error: {e}")
-        if debug:
-            raise  # Re-raise in debug mode to show full traceback
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        if debug:
-            raise  # Re-raise in debug mode to show full traceback
+    handle_exceptions(run_commands)
 
 
 if __name__ == "__main__":
     main()
-

@@ -55,7 +55,7 @@ def verify_artifact_signature(signature, public_key, artifact_filename):
         signature (bytes): The signature to verify.
         public_key (bytes): The public key in PEM format.
         artifact_filename (str): The path to the artifact file.
-        
+
     Raises:
         InvalidSignature: If the signature is invalid.
         ValueError: If there's an error in the verification process.
@@ -79,7 +79,9 @@ def verify_artifact_signature(signature, public_key, artifact_filename):
     try:
         public_key.verify(signature, data, ec.ECDSA(hashes.SHA256()))
     except InvalidSignature as e:
-        raise InvalidSignature("Signature verification failed: signature is invalid") from e
+        raise InvalidSignature(
+            "Signature verification failed: signature is invalid"
+        ) from e
     except (ValueError, TypeError) as e:
         raise ValueError(f"Signature verification failed: {e}") from e
 
@@ -106,23 +108,23 @@ def verify_artifact_with_log_entry(log_entry, artifact_filepath, debug=False):
         print("Decoded body:\n", decoded_body)
 
     body_json = json.loads(decoded_body)
-    
+
     # Fail fast if the expected schema is not present
     try:
         if "spec" not in body_json:
             raise KeyError("Missing 'spec' field in log entry body")
         if "signature" not in body_json["spec"]:
             raise KeyError("Missing 'signature' field in log entry spec")
-        
+
         signature_json = body_json["spec"]["signature"]
-        
+
         if "publicKey" not in signature_json:
             raise KeyError("Missing 'publicKey' field in signature")
         if "content" not in signature_json["publicKey"]:
             raise KeyError("Missing 'content' field in publicKey")
         if "content" not in signature_json:
             raise KeyError("Missing 'content' field in signature")
-            
+
         public_key_cert = signature_json["publicKey"]["content"]
         signature_b64 = signature_json["content"]
     except KeyError as e:
