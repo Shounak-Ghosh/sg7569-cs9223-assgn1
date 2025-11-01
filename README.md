@@ -1,19 +1,81 @@
-# sg7569-cs9223-assgn1
-Code for CS9223 Assignment 1 with Prof. Justin Cappos
+# SG7569 — CS9223 Assignment 1
 
-# Assignment 1 Notes
-- Used Go for installations
-- [Signing and uploading blobs w/ cosign](https://docs.sigstore.dev/cosign/signing/signing_with_blobs/)
-- `cosign sign-blob artifact.md --bundle artifact.bundle`
-    - This command automatically uploads to Rekor:
-        - https://rekor.sigstore.dev/api/v1/log?logIndex=495027577
-        - https://search.sigstore.dev/?logIndex=495027577
-- `python main.py --inclusion 495027577 --artifact artifact.md`
-- `python main.py --consistency --tree-id 1193050959916656506 --tree-size 373980633 --root-hash cf2af3bef55a119948a8e5c13cce1ea2c0807cdf400cb68ef21067e56dc3a2ba`
+A small toolkit and reference implementation for verifying Rekor transparency log entries
+using Merkle proofs and offline verification. This repository contains the code used for
+assignment 1 of the CS9223 course (software supply chain security).
 
-# Assignment 2 Notes
-- `ruff format`
-- `ruff check -o ruff.output.txt`
-- `pylint . --output pylint.output.txt`
-- `mypy main.py merkle_proof.py util.py > mypy.output.txt`
-- `bandit -r . -o bandit-output.txt -f txt`
+## Project contents
+
+- `assignment1/` — Primary assignment code and scripts.
+	- `main.py` — Command-line Rekor transparency log verifier (inclusion, checkpoint, consistency).
+	- `merkle_proof.py`, `util.py` — Helper modules for hashing, proof verification and signature checks.
+	- `artifact.bundle` — Example artifact bundle used by some of the verification helpers.
+
+## Requirements & Dependencies
+
+- Python: supported Python versions are >= 3.12 (see `pyproject.toml`).
+- Runtime dependencies (declared in `pyproject.toml`):
+	- `cryptography>=46.0.1`
+	- `requests>=2.32.5`
+
+Development tools (optional) are listed under the `dev` dependency group in
+`pyproject.toml` and include `bandit`, `mypy`, `pylint`, and `ruff`.
+
+## Installation
+
+1. Install uv (package manager): 
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+1. Setup and activate a virtual environment (recommended):
+
+```bash
+# Create virtual environment and install dependencies
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv sync
+```
+
+## Usage
+
+The main entrypoint for the assignment tools is `assignment1/main.py`. Typical commands:
+
+- Fetch and print the latest Rekor checkpoint:
+
+```bash
+python assignment1/main.py --checkpoint
+```
+
+- Verify inclusion of an artifact using a Rekor log index and a local artifact file:
+
+```bash
+python assignment1/main.py --inclusion 12345 --artifact path/to/artifact.file
+```
+
+- Verify consistency between a previous checkpoint and the latest Rekor checkpoint:
+
+```bash
+python assignment1/main.py --consistency --tree-id <TREE_ID> --tree-size <SIZE> --root-hash <ROOT>
+```
+
+Use `-d` / `--debug` with any command to enable verbose output for troubleshooting.
+
+## Notes and assumptions
+
+- The code uses the public Rekor instance endpoints that are referenced in
+	`assignment1/main.py`. Network access is required to fetch entries and proofs.
+- The repository expects Python 3.12+ (see `pyproject.toml`); if you use a different
+	Python version, some features or type checks may behave differently.
+- This README provides quick usage. For implementation details, consult the source
+	files in `assignment1/` (notably `main.py`, `merkle_proof.py`, and `util.py`).
+
+## License
+
+This project is provided under the license found in the repository `LICENSE` file.
+
+## Contact / Questions
+
+If you need clarifications about the assignment or the code, open an issue in the
+repository or contact the maintainer listed in the repository metadata.
+
