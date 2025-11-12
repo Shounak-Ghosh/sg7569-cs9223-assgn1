@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: trufflehog
+        name: TruffleHog
+        description: Detect secrets in your data.
+        entry: bash -c 'git diff --cached --name-only --diff-filter=d | xargs -r trufflehog filesystem --fail'
+        language: system
+        stages: ["pre-commit"]
