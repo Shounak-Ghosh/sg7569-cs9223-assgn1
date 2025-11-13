@@ -1,0 +1,9 @@
+# Commands used
+touch personal.txt
+git add .      
+git commit -m "personal.txt"
+git push --set-upstream origin part3
+git remote remove origin 
+git filter-repo --path personal.txt --invert-paths --force
+git remote add origin https://github.com/Shounak-Ghosh/sg7569-cs9223-assgn1.git
+git push --force --set-upstream origin part3  
