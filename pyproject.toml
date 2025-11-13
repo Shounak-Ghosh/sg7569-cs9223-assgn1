@@ -17,4 +17,11 @@ dev = [
     "pip>=25.2",
     "pylint>=3.3.9",
     "ruff>=0.14.0",
+    "pytest>=9.0.1",
+    "pytest-cov>=7.0.0",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--cov=assignment1 --cov-report=term-missing --cov-report=html"

@@ -9,8 +9,8 @@ import argparse
 import json
 import os
 import requests
-from util import verify_artifact_with_log_entry
-from merkle_proof import (
+from assignment1.util import verify_artifact_with_log_entry
+from assignment1.merkle_proof import (
     DefaultHasher,
     verify_consistency,
     verify_inclusion,
