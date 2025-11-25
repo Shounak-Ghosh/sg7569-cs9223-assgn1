@@ -655,7 +655,7 @@ wheels = [
 [[package]]
 name = "sg7569-cs9223-assgn1"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
     { name = "pre-commit" },
