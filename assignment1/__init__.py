@@ -8,7 +8,7 @@ using Merkle proofs and cryptographic verification.
 __version__ = "0.1.0"
 
 from assignment1.merkle_proof import (
-    DefaultHasher,
+    DEFAULT_HASHER,
     verify_consistency,
     verify_inclusion,
     compute_leaf_hash,
@@ -26,7 +26,7 @@ from assignment1.main import (
 )
 
 __all__ = [
-    "DefaultHasher",
+    "DEFAULT_HASHER",
     "verify_consistency",
     "verify_inclusion",
     "compute_leaf_hash",
