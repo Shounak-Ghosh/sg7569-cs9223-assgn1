@@ -4,7 +4,7 @@ import hashlib
 import pytest
 from assignment1.merkle_proof import (
     Hasher,
-    DefaultHasher,
+    DEFAULT_HASHER,
     ConsistencyProof,
     InclusionProof,
     RootMismatchError,
@@ -153,7 +153,7 @@ class TestRootFromInclusionProof:
 
     def test_root_from_inclusion_proof_index_beyond_size(self):
         """Test that index >= size raises ValueError."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         index = 10
         size = 5
         leaf_hash = b"a" * 32
@@ -164,7 +164,7 @@ class TestRootFromInclusionProof:
 
     def test_root_from_inclusion_proof_invalid_leaf_size(self):
         """Test that invalid leaf_hash size raises ValueError."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         index = 0
         size = 1
         leaf_hash = b"invalid_size"
@@ -179,7 +179,7 @@ class TestVerifyInclusion:
 
     def test_verify_inclusion_invalid_index(self):
         """Test verify_inclusion with index beyond size."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         index = 10
         size = 5
         inclusion_proof = InclusionProof(
@@ -197,7 +197,7 @@ class TestVerifyConsistency:
 
     def test_verify_consistency_size2_less_than_size1(self):
         """Test that size2 < size1 raises ValueError."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         size1 = 10
         size2 = 5
         consistency_proof = ConsistencyProof(
@@ -211,7 +211,7 @@ class TestVerifyConsistency:
 
     def test_verify_consistency_equal_sizes_empty_proof(self):
         """Test consistency when sizes are equal with empty proof."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         size1 = 5
         size2 = 5
         root = "a" * 64
@@ -225,7 +225,7 @@ class TestVerifyConsistency:
 
     def test_verify_consistency_equal_sizes_non_empty_proof(self):
         """Test consistency when sizes are equal but proof is not empty."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         size1 = 5
         size2 = 5
         consistency_proof = ConsistencyProof(
@@ -239,7 +239,7 @@ class TestVerifyConsistency:
 
     def test_verify_consistency_size1_zero_empty_proof(self):
         """Test consistency when size1=0 with empty proof."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         size1 = 0
         size2 = 5
         consistency_proof = ConsistencyProof(
@@ -252,7 +252,7 @@ class TestVerifyConsistency:
 
     def test_verify_consistency_size1_zero_non_empty_proof(self):
         """Test consistency when size1=0 but proof is not empty."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         size1 = 0
         size2 = 5
         consistency_proof = ConsistencyProof(
@@ -266,7 +266,7 @@ class TestVerifyConsistency:
 
     def test_verify_consistency_empty_proof_when_needed(self):
         """Test consistency when proof is needed but empty."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         size1 = 5
         size2 = 10
         consistency_proof = ConsistencyProof(
@@ -284,7 +284,7 @@ class TestChainFunctions:
 
     def test_chain_inner_basic(self):
         """Test chain_inner with basic inputs."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         seed = b"a" * 32
         proof = [b"b" * 32, b"c" * 32]
         index = 1
@@ -295,7 +295,7 @@ class TestChainFunctions:
 
     def test_chain_inner_empty_proof(self):
         """Test chain_inner with empty proof."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         seed = b"a" * 32
         proof = []
         index = 0
@@ -305,7 +305,7 @@ class TestChainFunctions:
 
     def test_chain_inner_right_basic(self):
         """Test chain_inner_right with basic inputs."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         seed = b"a" * 32
         proof = [b"b" * 32, b"c" * 32]
         index = 3
@@ -315,7 +315,7 @@ class TestChainFunctions:
 
     def test_chain_border_right_basic(self):
         """Test chain_border_right with basic inputs."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         seed = b"a" * 32
         proof = [b"b" * 32, b"c" * 32]
 
@@ -325,7 +325,7 @@ class TestChainFunctions:
 
     def test_chain_border_right_empty_proof(self):
         """Test chain_border_right with empty proof."""
-        hasher = DefaultHasher
+        hasher = DEFAULT_HASHER
         seed = b"a" * 32
         proof = []
 

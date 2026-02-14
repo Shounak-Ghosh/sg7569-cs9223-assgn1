@@ -33,6 +33,9 @@ exclude = ["tests/", ".venv/"]
 [tool.ruff.lint]
 select = ["E", "F", "W"]
 
+[tool.pylint.format]
+max-line-length = 120
+
 [tool.bandit]
 exclude_dirs = ["tests", ".venv"]
 

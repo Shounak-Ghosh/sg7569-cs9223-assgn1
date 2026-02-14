@@ -11,7 +11,7 @@ import os
 import requests
 from assignment1.util import verify_artifact_with_log_entry
 from assignment1.merkle_proof import (
-    DefaultHasher,
+    DEFAULT_HASHER,
     verify_consistency,
     verify_inclusion,
     compute_leaf_hash,
@@ -151,13 +151,9 @@ def inclusion(log_index, artifact_filepath, debug=False):
         print("Signature is valid.")
 
         # Verify inclusion proof
-        index, tree_size, leaf_hash, hashes, root_hash = get_verification_proof(
-            log_index, debug
-        )
-        inclusion_proof = InclusionProof(
-            leaf_hash=leaf_hash, proof=hashes, root=root_hash
-        )
-        verify_inclusion(DefaultHasher, index, tree_size, inclusion_proof)
+        index, tree_size, leaf_hash, hashes, root_hash = get_verification_proof(log_index, debug)
+        inclusion_proof = InclusionProof(leaf_hash=leaf_hash, proof=hashes, root=root_hash)
+        verify_inclusion(DEFAULT_HASHER, index, tree_size, inclusion_proof)
         print("Offline root hash calculation for inclusion verified.")
     except Exception as e:
         raise ValueError(f"Inclusion verification failed: {e}") from e
@@ -240,7 +236,7 @@ def consistency(prev_checkpoint, debug=False):
             root2=latest_checkpoint.get("rootHash"),
         )
         verify_consistency(
-            DefaultHasher,
+            DEFAULT_HASHER,
             prev_checkpoint.get("treeSize"),
             latest_tree_size,
             consistency_proof,
@@ -291,9 +287,7 @@ def main():
 
     def get_args():
         parser = argparse.ArgumentParser(description="Rekor Verifier")
-        parser.add_argument(
-            "-d", "--debug", help="Debug mode", required=False, action="store_true"
-        )  # Default false
+        parser.add_argument("-d", "--debug", help="Debug mode", required=False, action="store_true")  # Default false
         parser.add_argument(
             "-c",
             "--checkpoint",
@@ -321,18 +315,14 @@ def main():
             help="Verify consistency of a given checkpoint with the latest checkpoint.",
             action="store_true",
         )
-        parser.add_argument(
-            "--tree-id", help="Tree ID for consistency proof", required=False
-        )
+        parser.add_argument("--tree-id", help="Tree ID for consistency proof", required=False)
         parser.add_argument(
             "--tree-size",
             help="Tree size for consistency proof",
             required=False,
             type=int,
         )
-        parser.add_argument(
-            "--root-hash", help="Root hash for consistency proof", required=False
-        )
+        parser.add_argument("--root-hash", help="Root hash for consistency proof", required=False)
         return parser.parse_args()
 
     def handle_debug(args):
