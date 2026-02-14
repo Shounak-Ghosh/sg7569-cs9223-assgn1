@@ -1,0 +1,75 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-and-attest:
+    name: Build, SBOM & Attest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Build with Poetry
+        run: poetry build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+
+      - name: Export requirements.txt
+        run: poetry export -f requirements.txt -o requirements-export.txt --without-hashes
+
+      - name: Install cyclonedx-py
+        run: pip install cyclonedx-bom
+
+      - name: Generate CycloneDX SBOM
+        run: cyclonedx-py requirements requirements-export.txt -o dist/cyclonedx-sbom.json --output-format json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: dist/cyclonedx-sbom.json
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Attest SBOM to wheel
+        run: |
+          WHEEL=$(ls dist/*.whl)
+          cosign attest-blob \
+            --predicate dist/cyclonedx-sbom.json \
+            --type cyclonedx \
+            --bundle "${WHEEL}.bundle" \
+            --yes \
+            "${WHEEL}"
+
+      - name: Upload attestation bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: attestation
+          path: dist/*.whl.bundle
