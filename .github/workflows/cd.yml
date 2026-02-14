@@ -40,14 +40,14 @@ jobs:
             dist/*.whl
             dist/*.tar.gz
 
-      - name: Export requirements.txt
-        run: poetry export -f requirements.txt -o requirements-export.txt --without-hashes
+      - name: Generate requirements.txt
+        run: pip freeze > requirements.txt
 
       - name: Install cyclonedx-py
         run: pip install cyclonedx-bom
 
       - name: Generate CycloneDX SBOM
-        run: cyclonedx-py requirements requirements-export.txt -o dist/cyclonedx-sbom.json --output-format json
+        run: cyclonedx-py requirements requirements.txt -o dist/cyclonedx-sbom.json --output-format json
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
