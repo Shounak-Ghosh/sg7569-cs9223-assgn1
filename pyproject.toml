@@ -10,16 +10,14 @@ dependencies = [
     "requests>=2.32.5",
 ]
 
-[dependency-groups]
-dev = [
-    "bandit>=1.8.6",
-    "mypy>=1.18.2",
-    "pip>=25.2",
-    "pylint>=3.3.9",
-    "ruff>=0.14.0",
-    "pytest>=9.0.1",
-    "pytest-cov>=7.0.0",
-]
+[tool.poetry.group.dev.dependencies]
+bandit = ">=1.8.6"
+mypy = ">=1.18.2"
+pip = ">=25.2"
+pylint = ">=3.3.9"
+ruff = ">=0.14.0"
+pytest = ">=9.0.1"
+pytest-cov = ">=7.0.0"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
