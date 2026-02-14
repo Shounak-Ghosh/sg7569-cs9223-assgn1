@@ -52,7 +52,7 @@ jobs:
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sbom
+          name: SBOM
           path: dist/cyclonedx-sbom.json
 
       - name: Install cosign
@@ -71,5 +71,5 @@ jobs:
       - name: Upload attestation bundle
         uses: actions/upload-artifact@v4
         with:
-          name: attestation
+          name: Attestation
           path: dist/*.whl.bundle
