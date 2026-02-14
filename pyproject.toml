@@ -26,6 +26,16 @@ pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "--cov=assignment1 --cov-report=term-missing --cov-report=html"
 
+[tool.ruff]
+line-length = 120
+exclude = ["tests/", ".venv/"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
+
 # Added build system configuration
 [build-system]
 requires = ["poetry-core>=1.0.0"]
