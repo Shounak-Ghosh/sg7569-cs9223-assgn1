@@ -1,5 +1,9 @@
 # SG7569 — CS9223 Assignment 1
 
+[![CI](https://github.com/Shounak-Ghosh/sg7569-cs9223-assgn1/actions/workflows/ci.yml/badge.svg)](https://github.com/Shounak-Ghosh/sg7569-cs9223-assgn1/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Shounak-Ghosh/sg7569-cs9223-assgn1/badge)](https://scorecard.dev/viewer/?uri=github.com/Shounak-Ghosh/sg7569-cs9223-assgn1)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11946/badge)](https://www.bestpractices.dev/projects/11946)
+
 A small toolkit and reference implementation for verifying Rekor transparency log entries
 using Merkle proofs and offline verification. This repository contains the code used for
 assignment 1 of the CS9223 course (software supply chain security).
